@@ -1,0 +1,434 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #000000;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.tv-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  box-sizing: border-box;
+  padding: 20px;
+  --fade-duration: 0.3s;
+  /* CSS variable for fade duration */
+}
+
+.tv-app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 1.5em;
+}
+
+.video-area {
+  width: 80%;
+  max-width: 1280px;
+  aspect-ratio: 16 / 9;
+  position: relative;
+  background-color: #222222;
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+  margin-bottom: 10px;
+  /* Space for progress bar */
+}
+
+.video-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.video-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  opacity: 1;
+  transition: opacity var(--fade-duration) ease-in-out;
+}
+
+/* .video-container.fading video { NO LONGER NEEDED if style opacity is directly managed */
+/* opacity: 0; */
+/* } */
+
+
+.video-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #333333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2em;
+  z-index: 1;
+  border-radius: inherit;
+  transition: opacity var(--fade-duration) ease-in-out;
+}
+
+/* New styles for playback controls */
+.video-playback-controls {
+  width: 80%;
+  max-width: 1280px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  /* Space before info bar */
+  height: 20px;
+  /* Fixed height for alignment */
+}
+
+.progress-bar-container {
+  flex-grow: 1;
+  height: 8px;
+  background-color: #444;
+  /* Darker background for the track */
+  border-radius: 4px;
+  overflow: hidden;
+  /* To round the inner bar */
+  margin-right: 10px;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #ff0000;
+  /* Red progress */
+  border-radius: 4px;
+  transition: width 0.1s linear;
+  /* Smooth width transition for progress */
+}
+
+.time-display {
+  font-size: 0.8em;
+  color: #ccc;
+  min-width: 90px;
+  /* "00:00 / 00:00" */
+  text-align: right;
+}
+
+
+.info-bar {
+  width: 80%;
+  max-width: 1280px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* Vertically align items */
+  padding: 8px 10px;
+  /* Adjusted padding */
+  margin-top: 0;
+  /* Removed top margin as playback-controls has bottom margin */
+  font-size: 0.9em;
+  background-color: rgba(20, 20, 20, 0.7);
+  border-radius: 4px;
+}
+
+.info-text {
+  display: flex;
+  flex-direction: column;
+  /* Stack channel and video name */
+  overflow: hidden;
+  flex-grow: 1;
+}
+
+.channel-name,
+.video-name {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.channel-name {
+  font-weight: bold;
+  font-size: 1em;
+  /* Slightly larger */
+}
+
+.video-name {
+  font-size: 0.85em;
+  color: #ddd;
+}
+
+.mute-button {
+  background-color: #333;
+  color: white;
+  border: 1px solid #555;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  margin-left: 15px;
+  /* Space from info text */
+  transition: background-color 0.2s;
+}
+
+.mute-button:hover {
+  background-color: #444;
+}
+
+.mute-button:active {
+  background-color: #555;
+}
+
+
+.controls-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+  user-select: none;
+}
+
+.key-indicator {
+  background-color: #2a2a2a;
+  border: 2px solid #555;
+  color: #ccc;
+  padding: 8px 12px;
+  margin: 4px;
+  border-radius: 4px;
+  min-width: 20px;
+  text-align: center;
+  font-size: 1.2em;
+  transition: border-color 0.1s ease-in-out, background-color 0.1s ease-in-out;
+}
+
+.key-indicator.active {
+  border-color: #f0ad4e;
+  background-color: #444;
+}
+
+.key-group-middle {
+  display: flex;
+}
+
+
+
+.video-area {
+  width: 80%;
+  max-width: 1280px;
+  aspect-ratio: 16 / 9;
+  position: relative;
+  background-color: #222222;
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+  margin-bottom: 10px;
+  cursor: pointer;
+  /* Indicate clickable area for play/pause */
+}
+
+.video-container {
+  /* ... same ... */
+}
+
+.video-container video {
+  /* ... same ... */
+}
+
+.video-placeholder {
+  /* ... same ... */
+}
+
+/* New: Video Overlay for Play/Pause Icon */
+.video-overlay-controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.3);
+  /* Semi-transparent background */
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  pointer-events: none;
+  /* Don't interfere with clicks on video area unless needed */
+  z-index: 2;
+  border-radius: inherit;
+}
+
+/* Show overlay when parent .video-area is hovered OR when !isPlaying (paused) */
+.video-area:hover .video-overlay-controls,
+.video-overlay-controls:has(svg)
+
+/* Simplified: if it has content (icon) */
+  {
+  opacity: 1;
+}
+
+/* If always showing when paused */
+.video-container:has(video:paused)~.video-overlay-controls {
+  /* This selector is a bit complex and support varies, better to use JS state like `showControlsOverlay || !isPlaying` */
+}
+
+/* The JS logic (showControlsOverlay || !isPlaying) combined with opacity on video-overlay-controls will handle visibility well */
+.video-overlay-controls svg {
+  filter: drop-shadow(0px 0px 5px rgba(0, 0, 0, 0.7));
+}
+
+
+.video-playback-controls {
+  /* ... same ... */
+}
+
+.progress-bar-container {
+  /* ... same ... */
+}
+
+.progress-bar {
+  /* ... same ... */
+}
+
+.time-display {
+  /* ... same ... */
+}
+
+.info-bar {
+  width: 80%;
+  max-width: 1280px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  margin-top: 0;
+  font-size: 0.9em;
+  background-color: rgba(20, 20, 20, 0.7);
+  border-radius: 4px;
+}
+
+.info-text {
+  /* ... same ... */
+}
+
+.channel-name,
+.video-name {
+  /* ... same ... */
+}
+
+
+/* Styles for action buttons container and individual buttons */
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Space between buttons */
+}
+
+.control-button {
+  background-color: #333;
+  color: white;
+  border: 1px solid #555;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: background-color 0.2s, border-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  /* Space between icon and text in button */
+}
+
+.control-button:hover {
+  background-color: #444;
+  border-color: #777;
+}
+
+.control-button:active {
+  background-color: #555;
+}
+
+.control-button svg {
+  width: 16px;
+  /* Adjust icon size in buttons */
+  height: 16px;
+}
+
+.button-text {
+  display: inline-block;
+  /* To ensure it flows with icon */
+}
+
+/* Specific for fullscreen button text visibility */
+.tv-app:fullscreen .fullscreen-button .button-text:not(:empty)::before {
+  /* content: 'Exit FS (F)'; */
+  /* Not needed, JS handles text */
+}
+
+.tv-app:not(:fullscreen) .fullscreen-button .button-text:not(:empty)::before {
+  /* content: 'Fullscreen (F)'; */
+  /* Not needed, JS handles text */
+}
+
+
+.controls-display {
+  /* ... same ... */
+}
+
+.key-indicator {
+  /* ... same ... */
+}
+
+.key-indicator.active {
+  /* ... same ... */
+}
+
+.key-group-middle {
+  /* ... same ... */
+}
+
+/* Optional: Style for text-based play/pause status */
+.play-pause-status-text {
+  margin-top: 10px;
+  font-size: 0.9em;
+  color: #aaa;
+}
+
+/* Fullscreen specific styles */
+.tv-app:fullscreen {
+  /* Optionally override some styles when in fullscreen */
+  padding: 0;
+  /* Remove padding to use full screen */
+}
+
+.tv-app:fullscreen .video-area {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+.tv-app:fullscreen .video-playback-controls,
+.tv-app:fullscreen .info-bar,
+.tv-app:fullscreen .controls-display {
+  /* You might want to hide these or style them differently in fullscreen */
+  /* For now, let's keep them, but position them carefully if needed */
+  /* Example: Position info-bar at bottom */
+  /* position: fixed; */
+  /* bottom: 0; */
+  /* left: 0; */
+  /* right: 0; */
+  /* z-index: 10; */
+  /* background-color: rgba(0,0,0,0.8); */
+  /* max-width: 100%; */
+  /* width: 100%; */
+  /* border-radius: 0; */
+}
+
+/* A simpler approach for now: let them be, they'll be part of the fullscreen element */

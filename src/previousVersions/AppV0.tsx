@@ -1,0 +1,380 @@
+import React, { useState, useEffect, useRef, useCallback } from "react";
+
+// --- Data Structures ---
+interface Video {
+  id: string;
+  src: string; // URL to the video file
+  filename: string; // Display name
+}
+
+interface Channel {
+  id: string;
+  name: string;
+  videos: Video[];
+}
+
+// --- Constants ---
+const FADE_DURATION_MS = 300; // Duration for fade in/out
+const PRELOAD_AHEAD_COUNT = 2; // How many videos ahead in the current channel to preload
+const MAX_CONCURRENT_PRELOADS = 3; // Max videos to keep blobs for (to manage memory)
+
+// --- Placeholder Data (Replace with your actual data) ---
+const channelsData: Channel[] = [
+  {
+    id: "channel1",
+    name: "Nature Relaxation",
+    videos: [
+      {
+        id: "vid1a",
+        src: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        filename: "BigBuckBunny.mp4",
+      },
+      {
+        id: "vid1b",
+        src: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+        filename: "ElephantsDream.mp4",
+      },
+      {
+        id: "vid1c",
+        src: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+        filename: "ForBiggerBlazes.mp4",
+      },
+    ],
+  },
+  {
+    id: "channel2",
+    name: "Short Films",
+    videos: [
+      {
+        id: "vid2a",
+        src: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+        filename: "ForBiggerEscapes.mp4",
+      },
+      {
+        id: "vid2b",
+        src: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+        filename: "ForBiggerFun.mp4",
+      },
+      {
+        id: "vid2c",
+        src: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+        filename: "ForBiggerJoyrides.mp4",
+      },
+    ],
+  },
+  {
+    id: "channel3",
+    name: "Tech Demos",
+    videos: [
+      {
+        id: "vid3a",
+        src: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+        filename: "Sintel.mp4",
+      },
+      {
+        id: "vid3b",
+        src: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4",
+        filename: "SubaruOutback.mp4",
+      },
+      {
+        id: "vid3c",
+        src: "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+        filename: "TearsOfSteel.mp4",
+      },
+    ],
+  },
+];
+
+// --- Helper for preloading ---
+// Stores original src -> blobUrl
+const preloadedVideoBlobs = new Map<string, string>();
+// Stores original src -> Promise of blobUrl (to avoid redundant fetches)
+const pendingPreloads = new Map<string, Promise<string>>();
+// Keeps track of blob URLs for eviction (FIFO queue)
+const blobUrlEvictionQueue: string[] = [];
+
+const preloadVideoAsBlob = async (videoSrc: string): Promise<string> => {
+  if (preloadedVideoBlobs.has(videoSrc)) {
+    return preloadedVideoBlobs.get(videoSrc)!;
+  }
+  if (pendingPreloads.has(videoSrc)) {
+    return pendingPreloads.get(videoSrc)!;
+  }
+
+  const promise = fetch(videoSrc)
+    .then((response) => {
+      if (!response.ok)
+        throw new Error(`Failed to fetch ${videoSrc}: ${response.statusText}`);
+      return response.blob();
+    })
+    .then((blob) => {
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Eviction strategy: if cache is full, remove oldest
+      if (blobUrlEvictionQueue.length >= MAX_CONCURRENT_PRELOADS) {
+        const oldestOriginalSrc = blobUrlEvictionQueue.shift();
+        if (oldestOriginalSrc) {
+          const blobToRevoke = preloadedVideoBlobs.get(oldestOriginalSrc);
+          if (blobToRevoke) {
+            URL.revokeObjectURL(blobToRevoke);
+            preloadedVideoBlobs.delete(oldestOriginalSrc);
+            // console.log(`Evicted and revoked: ${oldestOriginalSrc}`);
+          }
+        }
+      }
+
+      preloadedVideoBlobs.set(videoSrc, blobUrl);
+      blobUrlEvictionQueue.push(videoSrc); // Add to eviction queue
+      // console.log(`Preloaded and cached: ${videoSrc} as ${blobUrl}`);
+      return blobUrl;
+    })
+    .catch((error) => {
+      console.error(`Error preloading video ${videoSrc}:`, error);
+      // If fails, we'll just use the original src later
+      return videoSrc;
+    })
+    .finally(() => {
+      pendingPreloads.delete(videoSrc);
+    });
+
+  pendingPreloads.set(videoSrc, promise);
+  return promise;
+};
+
+const TVApp: React.FC = () => {
+  const [currentChannelIndex, setCurrentChannelIndex] = useState(0);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [isFading, setIsFading] = useState(false);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [videoSrcToPlay, setVideoSrcToPlay] = useState<string>("");
+  const [showPlaceholder, setShowPlaceholder] = useState(true);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const currentChannel = channelsData[currentChannelIndex];
+  const currentVideo = currentChannel?.videos[currentVideoIndex];
+
+  const getVideoSource = useCallback((originalSrc: string): string => {
+    return preloadedVideoBlobs.get(originalSrc) || originalSrc;
+  }, []);
+
+  // Effect for Preloading
+  useEffect(() => {
+    if (!currentChannel) return;
+
+    const videosToPreload: string[] = [];
+    // Preload next N videos in current channel
+    for (let i = 0; i < PRELOAD_AHEAD_COUNT; i++) {
+      const nextVideoIdx =
+        (currentVideoIndex + 1 + i) % currentChannel.videos.length;
+      if (currentChannel.videos[nextVideoIdx]) {
+        videosToPreload.push(currentChannel.videos[nextVideoIdx].src);
+      }
+    }
+    // Preload first video of next channel
+    const nextChannelIndex = (currentChannelIndex + 1) % channelsData.length;
+    if (channelsData[nextChannelIndex]?.videos[0]) {
+      videosToPreload.push(channelsData[nextChannelIndex].videos[0].src);
+    }
+    // Preload first video of previous channel
+    const prevChannelIndex =
+      (currentChannelIndex - 1 + channelsData.length) % channelsData.length;
+    if (channelsData[prevChannelIndex]?.videos[0]) {
+      videosToPreload.push(channelsData[prevChannelIndex].videos[0].src);
+    }
+
+    videosToPreload.forEach((src) => {
+      if (!preloadedVideoBlobs.has(src) && !pendingPreloads.has(src)) {
+        // console.log("Attempting to preload:", src);
+        preloadVideoAsBlob(src).catch((e) =>
+          console.warn("Preload failed for", src, e)
+        );
+      }
+    });
+  }, [currentChannelIndex, currentVideoIndex, currentChannel]);
+
+  // Effect for handling video source changes and transitions
+  useEffect(() => {
+    if (!currentVideo) {
+      setShowPlaceholder(true);
+      if (videoRef.current) videoRef.current.src = "";
+      return;
+    }
+
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current);
+    }
+
+    setIsFading(true);
+    setShowPlaceholder(true); // Show placeholder during fade
+
+    transitionTimeoutRef.current = setTimeout(() => {
+      const src = getVideoSource(currentVideo.src);
+      setVideoSrcToPlay(src);
+      setShowPlaceholder(false); // Hide placeholder, video will load
+      setIsFading(false);
+      // The actual play is handled by onLoadedData or autoplay attribute
+    }, FADE_DURATION_MS);
+
+    return () => {
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
+    };
+  }, [currentVideo, getVideoSource]); // Re-run when currentVideo changes
+
+  useEffect(() => {
+    if (videoRef.current && videoSrcToPlay) {
+      videoRef.current.src = videoSrcToPlay;
+      // Autoplay might be blocked if not muted. Ensure `muted` and `playsInline` are on the video tag.
+      // videoRef.current.load(); // src assignment usually triggers load
+      // videoRef.current.play().catch(e => console.warn("Autoplay prevented:", e));
+    }
+  }, [videoSrcToPlay]);
+
+  const handleVideoEnded = useCallback(() => {
+    setCurrentVideoIndex(
+      (prevIndex) => (prevIndex + 1) % (currentChannel?.videos.length || 1)
+    );
+  }, [currentChannel]);
+
+  const handleLoadedData = () => {
+    if (videoRef.current) {
+      videoRef.current
+        .play()
+        .catch((e) => console.warn("Play on load prevented:", e));
+      setShowPlaceholder(false); // Ensure placeholder is hidden once data loads
+    }
+  };
+
+  const handleError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    console.error("Video Error:", e);
+    setShowPlaceholder(true); // Show placeholder on error
+    // Optionally, try to advance to the next video
+    // handleVideoEnded();
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!currentChannel) return;
+      setActiveKey(event.key);
+
+      let newChannelIndex = currentChannelIndex;
+      let newVideoIndex = currentVideoIndex;
+
+      switch (event.key) {
+        case "ArrowUp":
+          newChannelIndex =
+            (currentChannelIndex - 1 + channelsData.length) %
+            channelsData.length;
+          newVideoIndex = 0; // Start from the first video of the new channel
+          break;
+        case "ArrowDown":
+          newChannelIndex = (currentChannelIndex + 1) % channelsData.length;
+          newVideoIndex = 0; // Start from the first video of the new channel
+          break;
+        case "ArrowLeft":
+          newVideoIndex =
+            (currentVideoIndex - 1 + currentChannel.videos.length) %
+            currentChannel.videos.length;
+          break;
+        case "ArrowRight":
+          newVideoIndex =
+            (currentVideoIndex + 1) % currentChannel.videos.length;
+          break;
+        default:
+          return; // Do nothing for other keys
+      }
+
+      if (newChannelIndex !== currentChannelIndex) {
+        setCurrentChannelIndex(newChannelIndex);
+        setCurrentVideoIndex(newVideoIndex); // This will also update currentVideo
+      } else if (newVideoIndex !== currentVideoIndex) {
+        setCurrentVideoIndex(newVideoIndex); // This will also update currentVideo
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (
+        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)
+      ) {
+        setActiveKey(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [currentChannelIndex, currentVideoIndex, currentChannel]);
+
+  if (!currentChannel || !currentVideo) {
+    return <div className='tv-app-loading'>Loading channels...</div>;
+  }
+
+  return (
+    <div className='tv-app'>
+      <div className='video-area'>
+        <div className={`video-container ${isFading ? "fading" : ""}`}>
+          {showPlaceholder && (
+            <div className='video-placeholder'>Video Loading...</div>
+          )}
+          <video
+            ref={videoRef}
+            key={currentVideo.id} // Important for React to re-render if only src changes on same element type
+            onEnded={handleVideoEnded}
+            onLoadedData={handleLoadedData}
+            onError={handleError}
+            autoPlay
+            muted // Autoplay often requires muted
+            playsInline // Good for mobile
+            style={{ opacity: showPlaceholder ? 0 : 1 }} // Hide video element if placeholder is shown
+          />
+        </div>
+      </div>
+
+      <div className='info-bar'>
+        <span className='channel-name'>Channel: {currentChannel.name}</span>
+        <span className='video-name'>Video: {currentVideo.filename}</span>
+      </div>
+
+      <div className='controls-display'>
+        <div
+          className={`key-indicator ${activeKey === "ArrowUp" ? "active" : ""}`}
+        >
+          ▲
+        </div>
+        <div className='key-group-middle'>
+          <div
+            className={`key-indicator ${
+              activeKey === "ArrowLeft" ? "active" : ""
+            }`}
+          >
+            ◄
+          </div>
+          <div
+            className={`key-indicator ${
+              activeKey === "ArrowDown" ? "active" : ""
+            }`}
+          >
+            ▼
+          </div>
+          <div
+            className={`key-indicator ${
+              activeKey === "ArrowRight" ? "active" : ""
+            }`}
+          >
+            ►
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TVApp;
