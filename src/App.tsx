@@ -111,8 +111,8 @@ const TVApp: React.FC = () => {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoAreaRef = useRef<HTMLDivElement>(null); // For fullscreen target
-  const transitionTimeoutRef = useRef<Timeout | null>(null);
-  const overlayTimeoutRef = useRef<Timeout | null>(null);
+  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const currentChannel = channelsData[currentChannelIndex];
   const currentVideo = currentChannel?.videos[currentVideoIndex];

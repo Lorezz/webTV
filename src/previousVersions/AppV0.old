@@ -150,7 +150,7 @@ const TVApp: React.FC = () => {
   const [showPlaceholder, setShowPlaceholder] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const transitionTimeoutRef = useRef<Timeout | null>(null);
 
   const currentChannel = channelsData[currentChannelIndex];
   const currentVideo = currentChannel?.videos[currentVideoIndex];
